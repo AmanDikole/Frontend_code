@@ -1,209 +1,181 @@
 "use client";
 
 import React, { useState } from "react";
-import Image from "next/image";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
+import Navbar from "../Components/Navbar";
+import Footer from "../Components/Footer";
+import { FaEnvelope, FaLock, FaSignInAlt, FaArrowRight } from "react-icons/fa";
 import Link from "next/link";
-import { useAuth } from "../../context/AuthContext"; // 👈 Import the Context Hook
-import { FaUser, FaBuilding, FaGoogle, FaEnvelope, FaMobileAlt, FaLock } from "react-icons/fa";
+import { useAuth } from "@/context/AuthContext"; // Optional: Use this if you want context updates
 
 export default function LoginPage() {
-  const { login } = useAuth(); // 👈 Get the login function from Context
-  
-  // UI States
-  const [role, setRole] = useState<"candidate" | "recruiter">("candidate");
-  const [loginMethod, setLoginMethod] = useState<"email" | "mobile">("email");
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   
-  // Form States
+  // Use Context if available, otherwise we use local logic below
+  // const { login } = useAuth(); 
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mobile, setMobile] = useState("");
-  const [otp, setOtp] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // Simulate API Network Request delay
-    setTimeout(() => {
-      // 👈 Call the Global Login function
-      // This will update the Navbar and redirect you automatically
-      login(role); 
+    try {
+      // 1. Call Java Backend
+      const response = await fetch("http://localhost:8080/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Invalid Email or Password");
+      }
+
+      // 2. Get User Data
+      const userData = await response.json();
+
+      // 3. Save & Redirect
+      // If you are using the AuthContext we built earlier, use: login(userData);
+      // Otherwise, keep this manual logic:
+      localStorage.setItem("user", JSON.stringify(userData));
+      
+      toast.success(`Welcome back, ${userData.fullName}!`);
+      router.push("/profile"); 
+
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
-    <section className="min-h-screen flex flex-col bg-gray-50">
-      <div className="flex flex-1 items-center justify-center px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-0 max-w-5xl w-full bg-white rounded-2xl shadow-2xl overflow-hidden">
+    <div className="min-h-screen flex flex-col font-sans bg-slate-50 selection:bg-blue-100">
+      <Navbar />
+
+      {/* --- Main Content with Gradient Background --- */}
+      <div className="flex-grow flex items-center justify-center p-6 relative overflow-hidden">
+        
+        {/* Background Decor (Blobs) */}
+        <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+        <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+        <div className="absolute bottom-[-20%] left-[20%] w-96 h-96 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
+
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden border border-white/50 flex flex-col md:flex-row z-10 animate-fade-in-up">
           
-          {/* Left: Illustration / Branding */}
-          <div className={`hidden md:flex flex-col justify-center items-center p-10 ${role === 'candidate' ? 'bg-blue-600' : 'bg-slate-900'} text-white transition-colors duration-500`}>
-            <div className="mb-8">
-               {/* Replace with your image */}
-               <div className="w-64 h-64 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                  {role === 'candidate' ? (
-                    <FaUser size={80} className="text-white" />
-                  ) : (
-                    <FaBuilding size={80} className="text-white" />
-                  )}
-               </div>
+          {/* Left Side: Visual/Branding */}
+          <div className="md:w-1/2 bg-gradient-to-br from-slate-800 to-black p-10 flex flex-col justify-between text-white relative overflow-hidden">
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+            
+            <div className="z-10">
+              <h2 className="text-3xl font-bold mb-2">JobPortal</h2>
+              <div className="h-1 w-12 bg-blue-500 rounded-full"></div>
             </div>
-            <h2 className="text-3xl font-bold mb-4">
-              {role === 'candidate' ? "Welcome Back!" : "Hire Top Talent"}
-            </h2>
-            <p className="text-center text-blue-100 max-w-xs">
-              {role === 'candidate' 
-                ? "Login to track your applications and find your dream job." 
-                : "Login to manage job postings and screen candidates."}
-            </p>
+
+            <div className="z-10 my-10">
+              <h1 className="text-4xl font-bold leading-tight mb-4">
+                Find your <br/> 
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+                  Dream Job
+                </span> <br/>
+                Today.
+              </h1>
+              <p className="text-slate-400 text-sm leading-relaxed">
+                Connect with thousands of top-tier companies and start your career journey with confidence.
+              </p>
+            </div>
+
+            <div className="z-10 text-xs text-slate-500">
+              © 2026 JobPortal Inc.
+            </div>
           </div>
 
-          {/* Right: Login Form */}
-          <div className="flex flex-col justify-center p-8 md:p-12">
+          {/* Right Side: Login Form */}
+          <div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
             
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Login</h2>
-            <p className="text-gray-500 mb-8 text-sm">Welcome back! Please enter your details.</p>
-
-            {/* --- Role Toggle --- */}
-            <div className="bg-gray-100 p-1 rounded-lg flex mb-6">
-              <button
-                onClick={() => setRole("candidate")}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-semibold transition-all ${
-                  role === "candidate" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                <FaUser /> Candidate
-              </button>
-              <button
-                onClick={() => setRole("recruiter")}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-semibold transition-all ${
-                  role === "recruiter" ? "bg-white text-slate-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                <FaBuilding /> Recruiter
-              </button>
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-slate-800 mb-1">Welcome Back!</h2>
+              <p className="text-sm text-slate-500">Please enter your details to sign in.</p>
             </div>
 
-            {/* --- Method Toggle (Email/Mobile) --- */}
-            <div className="flex gap-6 mb-6 border-b border-gray-200">
-              <button
-                onClick={() => setLoginMethod("email")}
-                className={`pb-2 text-sm font-medium transition-colors ${
-                  loginMethod === "email"
-                    ? "text-blue-600 border-b-2 border-blue-600"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                Email & Password
-              </button>
-              <button
-                onClick={() => setLoginMethod("mobile")}
-                className={`pb-2 text-sm font-medium transition-colors ${
-                  loginMethod === "mobile"
-                    ? "text-blue-600 border-b-2 border-blue-600"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                Mobile & OTP
-              </button>
-            </div>
+            <form onSubmit={handleLogin} className="space-y-6">
+              
+              {/* Email Input */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Email Address</label>
+                <div className="relative group">
+                  <FaEnvelope className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                  <input 
+                    type="email" 
+                    required
+                    className="w-full pl-10 p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-transparent outline-none transition-all text-slate-700"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+              </div>
 
-            <form className="space-y-4" onSubmit={handleLogin}>
-              {loginMethod === "email" ? (
-                <>
-                  {/* Email Input */}
-                  <div className="relative">
-                    <FaEnvelope className="absolute left-4 top-3.5 text-gray-400" />
-                    <input
-                      type="email"
-                      required
-                      placeholder="Email Address"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg py-3 pl-10 pr-4 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
-                    />
-                  </div>
-                  {/* Password Input */}
-                  <div className="relative">
-                    <FaLock className="absolute left-4 top-3.5 text-gray-400" />
-                    <input
-                      type="password"
-                      required
-                      placeholder="Password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg py-3 pl-10 pr-4 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
-                    />
-                  </div>
-                  <div className="text-right">
-                    <a href="#" className="text-xs text-blue-600 hover:underline">Forgot Password?</a>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Mobile Input */}
-                  <div className="relative">
-                    <FaMobileAlt className="absolute left-4 top-3.5 text-gray-400" />
-                    <input
-                      type="tel"
-                      required
-                      placeholder="Mobile Number"
-                      value={mobile}
-                      onChange={(e) => setMobile(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg py-3 pl-10 pr-4 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
-                    />
-                  </div>
-                  {/* OTP Input */}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Enter OTP"
-                      className="flex-1 border border-gray-300 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
-                    />
-                    <button type="button" className="px-4 py-2 text-sm text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 font-medium">
-                      Get OTP
-                    </button>
-                  </div>
-                </>
-              )}
+              {/* Password Input */}
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                    <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">Password</label>
+                    <a href="#" className="text-xs text-blue-600 hover:text-blue-800 hover:underline">Forgot Password?</a>
+                </div>
+                <div className="relative group">
+                  <FaLock className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                  <input 
+                    type="password" 
+                    required
+                    className="w-full pl-10 p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-transparent outline-none transition-all text-slate-700"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+              </div>
 
               {/* Login Button */}
-              <button
+              <button 
                 type="submit"
                 disabled={loading}
-                className={`w-full py-3 rounded-lg text-white font-bold shadow-lg transition-all transform active:scale-95 ${
-                    role === 'candidate' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-800 hover:bg-slate-900'
-                }`}
+                className="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl hover:bg-black hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all flex justify-center items-center gap-2 group"
               >
-                {loading ? "Signing in..." : role === "candidate" ? "Login as Candidate" : "Login as Recruiter"}
+                {loading ? (
+                    <span className="animate-pulse">Logging in...</span>
+                ) : (
+                    <>
+                        <FaSignInAlt className="group-hover:translate-x-1 transition-transform" /> 
+                        Sign In
+                    </>
+                )}
               </button>
             </form>
 
-            <div className="flex items-center my-6">
-              <div className="flex-grow border-t border-gray-300"></div>
-              <span className="mx-4 text-gray-400 text-xs uppercase">Or continue with</span>
-              <div className="flex-grow border-t border-gray-300"></div>
+            <div className="mt-8 relative flex py-5 items-center">
+                <div className="flex-grow border-t border-slate-200"></div>
+                <span className="flex-shrink-0 mx-4 text-slate-400 text-xs uppercase">New Here?</span>
+                <div className="flex-grow border-t border-slate-200"></div>
             </div>
 
-            <button
-              type="button"
-              className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-lg py-3 hover:bg-gray-50 transition-colors"
-            >
-              <FaGoogle className="text-red-500" />
-              <span className="text-sm font-medium text-gray-700">Google</span>
-            </button>
+            <div className="text-center">
+                <Link 
+                    href="/register" 
+                    className="inline-flex items-center justify-center gap-2 text-sm font-bold text-slate-700 hover:text-blue-600 transition-colors"
+                >
+                    Create an Account <FaArrowRight size={12} />
+                </Link>
+            </div>
 
-            <p className="text-center text-sm text-gray-500 mt-8">
-              Don't have an account?{" "}
-              <Link href="/register" className="text-blue-600 font-bold hover:underline">
-                Register Free
-              </Link>
-            </p>
           </div>
         </div>
       </div>
-    </section>
+      
+      <Footer />
+    </div>
   );
 }

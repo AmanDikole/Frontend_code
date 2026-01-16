@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../../lib/supabaseClient"; // Used @ alias for safety
+// import { supabase } from ... (REMOVED: We are using Java Backend now)
 import toast from "react-hot-toast"; 
 import { FaUser, FaBuilding, FaEnvelope, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
 
@@ -38,26 +38,35 @@ export default function RegisterPage() {
     }
 
     try {
-      // 2. Sign Up with Supabase
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.name,
-            role: role, // Save if they are a Candidate or Recruiter
-          },
-          emailRedirectTo: `${window.location.origin}/login`
-        }
+      // 2. Call Java Spring Boot Backend (No Supabase!)
+      const response = await fetch("http://localhost:8080/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        // Make sure these keys match your Java 'User.java' class exactly!
+        body: JSON.stringify({
+          fullName: formData.name, 
+          email: formData.email,
+          password: formData.password,
+          role: role
+        }),
       });
 
-      if (error) throw error;
+      // 3. Handle Errors
+      if (!response.ok) {
+        // If the backend sends an error (like "Email already taken"), read it here
+        const errorText = await response.text();
+        throw new Error(errorText || "Registration failed");
+      }
 
-      toast.success("Account created! Check your email to confirm.");
+      // 4. Success
+      toast.success("Account created successfully! Please Login.");
       router.push("/login");
 
     } catch (error: any) {
-      toast.error(error.message || "Registration failed");
+      console.error("Registration Error:", error);
+      toast.error(error.message || "Something went wrong");
     } finally {
       setLoading(false);
     }

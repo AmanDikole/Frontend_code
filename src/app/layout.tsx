@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-// IMPORT THE FILE YOU JUST CREATED
-import { AuthProvider } from "../context/AuthContext"; 
+import { Toaster } from "react-hot-toast";
+import { AuthProvider } from "@/context/AuthContext"; // 👈 1. Import this
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "JobPortal",
-  description: "Find your dream job",
+  title: "Job Portal",
+  description: "Find your dream job today",
 };
 
 export default function RootLayout({
@@ -18,11 +18,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
-        {/* WRAP CHILDREN WITH AUTH PROVIDER */}
+      <body className={inter.className} suppressHydrationWarning={true}>
+        
+        {/* 👈 2. Wrap EVERYTHING inside AuthProvider */}
         <AuthProvider>
+          <Toaster position="top-right" />
           {children}
         </AuthProvider>
+
       </body>
     </html>
   );

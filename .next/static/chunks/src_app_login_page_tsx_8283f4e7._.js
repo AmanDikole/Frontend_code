@@ -3,8 +3,8 @@
     chunks: [
   "static/chunks/node_modules_react-icons_fa_index_mjs_0459ff00._.js",
   "static/chunks/node_modules_react-icons_lib_844c6c50._.js",
-  "static/chunks/node_modules_next_dist_02409dcd._.js",
-  "static/chunks/src_app_login_page_tsx_a6b4ed9b._.js"
+  "static/chunks/node_modules_3bf364d7._.js",
+  "static/chunks/src_app_6f5975cd._.js"
 ],
     source: "dynamic"
 });

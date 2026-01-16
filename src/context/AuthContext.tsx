@@ -3,17 +3,18 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-// Define what a User looks like
+// 1. Define the User to match the JAVA BACKEND response exactly
 interface User {
-  name: string;
+  id: string;
+  fullName: string; // Changed from 'name' to match Java
   email: string;
-  role: "candidate" | "recruiter";
+  role: string;     // Java sends a string (candidate/recruiter)
 }
 
-// Define what the Context provides
+// 2. Update the Context functions
 interface AuthContextType {
   user: User | null;
-  login: (role: "candidate" | "recruiter") => void;
+  login: (userData: User) => void; // Now accepts the real user object
   logout: () => void;
 }
 
@@ -23,7 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
 
-  // 1. Check LocalStorage when the app loads (so you stay logged in on refresh)
+  // Load from LocalStorage on app start
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -31,30 +32,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // 2. Login Function
-  const login = (role: "candidate" | "recruiter") => {
-    const mockUser = {
-      name: role === "recruiter" ? "John Recruiter" : "Jane Candidate",
-      email: "test@example.com",
-      role: role,
-    };
+  // 3. Real Login Function
+  // We don't fetch here; we just save the data passed from the Login Page
+  const login = (userData: User) => {
+    setUser(userData);
+    localStorage.setItem("user", JSON.stringify(userData));
 
-    setUser(mockUser);
-    localStorage.setItem("user", JSON.stringify(mockUser));
-
-    // Redirect based on role
-    if (role === "recruiter") {
-      router.push("/recruiter");
+    // Optional: Redirect based on role if not handled in the page
+    if (userData.role === "recruiter") {
+      router.push("/post-job");
     } else {
-      router.push("/jobs");
+      router.push("/profile");
     }
   };
 
-  // 3. Logout Function
+  // 4. Logout Function
   const logout = () => {
     setUser(null);
     localStorage.removeItem("user");
     router.push("/login");
+    router.refresh(); // Forces the Navbar to update immediately
   };
 
   return (
@@ -64,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Custom Hook to use the Context easily
+// Custom Hook
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {

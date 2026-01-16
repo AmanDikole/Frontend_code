@@ -1,265 +1,187 @@
 "use client";
 
 import React, { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 import Navbar from "../Components/Navbar";
 import Footer from "../Components/Footer";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
-import { useForm, SubmitHandler } from "react-hook-form"; 
-import toast from "react-hot-toast"; 
-import { zodResolver } from "@hookform/resolvers/zod"; 
-import { supabase } from "@/supabaseClient"; // Import Supabase Client
-import * as z from "zod"; 
-import { 
-  FaBriefcase, 
-  FaBuilding, 
-  FaMapMarkerAlt, 
-  FaClock, 
-  FaListUl, 
-  FaCheck
-} from "react-icons/fa";
-
-// --- 1. DEFINE VALIDATION SCHEMA (ZOD) ---
-const jobSchema = z.object({
-  title: z.string().min(3, "Job title is too short").max(100),
-  companyName: z.string().min(2, "Company name is required"),
-  location: z.string().min(2, "Location is required"),
-  jobType: z.enum(["Full Time", "Part Time", "Contract", "Internship"]),
-  // ✅ FIX: Use z.coerce.number() to handle string-to-number conversion safely
-  salaryMin: z.coerce.number().min(1, "Salary must be a positive number"),
-  salaryMax: z.coerce.number().min(1, "Salary must be a positive number"),
-  description: z.string().min(20, "Description must be at least 20 characters"),
-  requirements: z.string().min(10, "Please list at least a few requirements"),
-});
-
-// Infer TypeScript type
-type JobFormData = z.infer<typeof jobSchema>;
+import toast from "react-hot-toast";
+import { FaBriefcase, FaMapMarkerAlt, FaMoneyBillWave, FaBuilding, FaPaperPlane, FaAlignLeft } from "react-icons/fa";
 
 export default function PostJobPage() {
-  const router = useRouter();
   const { user } = useAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
-  // --- 2. SETUP FORM HOOK ---
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<JobFormData>({
-    resolver: zodResolver(jobSchema),
-    defaultValues: {
-      jobType: "Full Time",
-      salaryMin: undefined, 
-      salaryMax: undefined
-    },
+  // Form State
+  const [jobData, setJobData] = useState({
+    title: "",
+    companyName: "",
+    location: "",
+    jobType: "Full-Time",
+    salaryMin: "",
+    salaryMax: "",
+    description: ""
   });
 
-  // --- 3. HANDLE SUBMISSION TO SPRING BOOT ---
-  const onSubmit: SubmitHandler<JobFormData> = async (data) => {
-    // 1. Check if user is logged in
-    if (!user) {
-        toast.error("You must be logged in to post a job.");
-        return;
-    }
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setJobData({ ...jobData, [e.target.name]: e.target.value });
+  };
 
-    setIsSubmitting(true);
-    const toastId = toast.loading("Posting job...");
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return toast.error("You must be logged in.");
+    setLoading(true);
 
     try {
-      // 2. Get the current session token (JWT)
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      if (!token) {
-        throw new Error("No access token found. Please log in again.");
-      }
-
-      // 3. Send request to Java Backend with Authorization Header
       const response = await fetch("http://localhost:8080/api/jobs", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` // 👈 SEND TOKEN TO JAVA
-        },
-        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...jobData,
+          postedBy: user.id, // Link job to the logged-in recruiter
+          salaryMin: Number(jobData.salaryMin),
+          salaryMax: Number(jobData.salaryMax)
+        }),
       });
 
-      if (!response.ok) {
-        // Handle 401 Unauthorized specifically
-        if (response.status === 401) {
-             throw new Error("Unauthorized! Your session may have expired.");
-        }
-        throw new Error("Failed to post job to backend");
-      }
+      if (!response.ok) throw new Error("Failed to post job");
 
-      // 4. Success!
-      toast.success("Job posted successfully!", { id: toastId });
-      router.push("/dashboard"); // Or /jobs
+      toast.success("Job Posted Successfully!");
+      router.push("/profile"); // Go back to dashboard
 
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || "Error connecting to server", { id: toastId });
+    } catch (error) {
+      toast.error("Something went wrong");
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
+    <div className="min-h-screen flex flex-col bg-slate-50 font-sans selection:bg-blue-100">
       <Navbar />
 
-      <div className="max-w-4xl mx-auto px-6 pt-32 pb-20">
-        
-        <div className="mb-10 text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Post a New Job</h1>
-          <p className="text-gray-500 mt-2">
-            Find the best talent. Listings are saved to your Enterprise Database.
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+      <div className="flex-grow pt-24 pb-12 px-4 flex justify-center animate-fade-in-up">
+        <div className="w-full max-w-3xl bg-white rounded-3xl shadow-2xl shadow-slate-200 border border-slate-100 overflow-hidden">
           
-          {/* Section 1: Basic Info */}
-          <div className="p-8 border-b border-gray-100">
-            <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-              <FaBriefcase className="text-blue-600" /> Basic Information
-            </h2>
+          {/* --- Header with Mesh Gradient --- */}
+          <div className="bg-slate-900 p-10 text-white relative overflow-hidden">
+            {/* Animated Glow Effects */}
+            <div className="absolute top-[-50%] right-[-10%] w-96 h-96 bg-blue-600 rounded-full mix-blend-overlay filter blur-[100px] opacity-50 animate-pulse"></div>
+            <div className="absolute bottom-[-50%] left-[-10%] w-96 h-96 bg-purple-600 rounded-full mix-blend-overlay filter blur-[100px] opacity-50 animate-pulse delay-1000"></div>
+            
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-3 bg-white/10 backdrop-blur-md rounded-xl border border-white/20">
+                  <FaPaperPlane className="text-blue-400" />
+                </div>
+                <h1 className="text-3xl font-bold tracking-tight">Post a New Job</h1>
+              </div>
+              <p className="text-slate-400 pl-1">Create a listing to find your next star employee.</p>
+            </div>
+          </div>
 
+          {/* --- Form --- */}
+          <form onSubmit={handleSubmit} className="p-8 md:p-10 space-y-8">
+            
+            {/* Section 1: Key Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              {/* Job Title */}
-              <div className="col-span-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Job Title</label>
-                <input 
-                  {...register("title")} 
-                  placeholder="e.g. Senior Java Developer"
-                  className={`w-full border rounded-lg p-3 outline-none focus:ring-2 transition-all ${errors.title ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"}`}
-                />
-                {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title.message}</p>}
-              </div>
-
-              {/* Company Name */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Company Name</label>
-                <div className="relative">
-                  <FaBuilding className="absolute left-3 top-3.5 text-gray-400" />
-                  <input 
-                    {...register("companyName")}
-                    placeholder="Company Name"
-                    className={`w-full border rounded-lg p-3 pl-10 outline-none focus:ring-2 ${errors.companyName ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"}`}
-                  />
+                <label className="block text-xs font-bold uppercase text-slate-500 tracking-wider mb-2 ml-1">Job Title</label>
+                <div className="relative group">
+                    <FaBriefcase className="absolute left-4 top-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                    <input name="title" required placeholder="e.g. Senior React Developer" onChange={handleChange} 
+                      className="w-full pl-12 p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" 
+                    />
                 </div>
-                {errors.companyName && <p className="text-red-500 text-xs mt-1">{errors.companyName.message}</p>}
               </div>
 
-              {/* Location */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Location</label>
-                <div className="relative">
-                  <FaMapMarkerAlt className="absolute left-3 top-3.5 text-gray-400" />
-                  <input 
-                    {...register("location")}
-                    placeholder="e.g. New York, NY"
-                    className={`w-full border rounded-lg p-3 pl-10 outline-none focus:ring-2 ${errors.location ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"}`}
-                  />
+                <label className="block text-xs font-bold uppercase text-slate-500 tracking-wider mb-2 ml-1">Company Name</label>
+                <div className="relative group">
+                    <FaBuilding className="absolute left-4 top-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                    <input name="companyName" required placeholder="e.g. TechCorp Inc." onChange={handleChange} 
+                      className="w-full pl-12 p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" 
+                    />
                 </div>
-                {errors.location && <p className="text-red-500 text-xs mt-1">{errors.location.message}</p>}
+              </div>
+            </div>
+
+            {/* Section 2: Logistics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 tracking-wider mb-2 ml-1">Location</label>
+                <div className="relative group">
+                    <FaMapMarkerAlt className="absolute left-4 top-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                    <input name="location" required placeholder="e.g. Remote / New York" onChange={handleChange} 
+                      className="w-full pl-12 p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" 
+                    />
+                </div>
               </div>
 
-              {/* Job Type */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Job Type</label>
+                <label className="block text-xs font-bold uppercase text-slate-500 tracking-wider mb-2 ml-1">Job Type</label>
                 <div className="relative">
-                  <FaClock className="absolute left-3 top-3.5 text-gray-400" />
-                  <select 
-                    {...register("jobType")}
-                    className="w-full border border-gray-300 rounded-lg p-3 pl-10 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                  >
-                    <option value="Full Time">Full Time</option>
-                    <option value="Part Time">Part Time</option>
-                    <option value="Contract">Contract</option>
-                    <option value="Internship">Internship</option>
+                  <select name="jobType" onChange={handleChange} className="w-full p-3.5 px-4 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-medium text-slate-700 appearance-none">
+                      <option>Full-Time</option>
+                      <option>Part-Time</option>
+                      <option>Contract</option>
+                      <option>Freelance</option>
                   </select>
+                  {/* Custom Arrow */}
+                  <div className="absolute right-4 top-4 pointer-events-none text-slate-400 text-xs">▼</div>
                 </div>
               </div>
+            </div>
 
-              {/* Salary Range */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Salary Range (Annual $)</label>
-                <div className="flex gap-2">
-                    <div className="w-full">
-                        <input 
-                            {...register("salaryMin")}
-                            placeholder="Min" 
-                            type="number" // ✅ Ensure this is type="number"
-                            className={`w-full border rounded-lg p-3 outline-none focus:ring-2 ${errors.salaryMin ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"}`}
+            {/* Section 3: Money */}
+            <div>
+                 <label className="block text-xs font-bold uppercase text-slate-500 tracking-wider mb-2 ml-1">Annual Salary Range</label>
+                 <div className="flex gap-4 items-center">
+                    <div className="relative flex-1 group">
+                        <FaMoneyBillWave className="absolute left-4 top-4 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                        <input name="salaryMin" type="number" placeholder="Min (e.g. 50k)" onChange={handleChange} 
+                          className="w-full pl-12 p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" 
                         />
-                         {errors.salaryMin && <p className="text-red-500 text-xs mt-1">{errors.salaryMin.message}</p>}
                     </div>
-                    <div className="w-full">
-                        <input 
-                            {...register("salaryMax")}
-                            placeholder="Max" 
-                            type="number" // ✅ Ensure this is type="number"
-                            className={`w-full border rounded-lg p-3 outline-none focus:ring-2 ${errors.salaryMax ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"}`}
+                    <span className="text-slate-300 font-light text-2xl">/</span>
+                    <div className="relative flex-1 group">
+                        <FaMoneyBillWave className="absolute left-4 top-4 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                        <input name="salaryMax" type="number" placeholder="Max (e.g. 80k)" onChange={handleChange} 
+                          className="w-full pl-12 p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" 
                         />
-                         {errors.salaryMax && <p className="text-red-500 text-xs mt-1">{errors.salaryMax.message}</p>}
                     </div>
+                 </div>
+            </div>
+
+            {/* Section 4: Description */}
+            <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 tracking-wider mb-2 ml-1">Job Description</label>
+                <div className="relative group">
+                    <FaAlignLeft className="absolute left-4 top-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                    <textarea 
+                      name="description" 
+                      required 
+                      rows={6} 
+                      placeholder="Describe the role, responsibilities, and requirements..." 
+                      onChange={handleChange} 
+                      className="w-full pl-12 p-4 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700 resize-none"
+                    ></textarea>
                 </div>
-              </div>
-
-            </div>
-          </div>
-
-          <div className="p-8">
-            <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-              <FaListUl className="text-blue-600" /> Job Details
-            </h2>
-
-            <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Job Description</label>
-                <textarea 
-                    {...register("description")}
-                    rows={6}
-                    placeholder="Describe the role..."
-                    className={`w-full border rounded-lg p-3 outline-none focus:ring-2 ${errors.description ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"}`}
-                />
-                {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description.message}</p>}
             </div>
 
-            <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Requirements</label>
-                <textarea 
-                    {...register("requirements")}
-                    rows={3}
-                    placeholder="e.g. Java, Spring Boot, SQL"
-                    className={`w-full border rounded-lg p-3 outline-none focus:ring-2 ${errors.requirements ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-500"}`}
-                />
-                {errors.requirements && <p className="text-red-500 text-xs mt-1">{errors.requirements.message}</p>}
-            </div>
+            {/* Submit Button */}
+            <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full py-4 rounded-xl text-white font-bold text-lg shadow-xl shadow-blue-500/20 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 transform hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+            >
+                {loading ? "Posting..." : <><FaPaperPlane /> Publish Job Listing</>}
+            </button>
 
-            <div className="flex justify-end gap-4 mt-8 pt-6 border-t border-gray-100">
-                <button 
-                    type="button" 
-                    onClick={() => router.back()}
-                    className="px-6 py-3 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                    Cancel
-                </button>
-                <button 
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                    {isSubmitting ? "Posting..." : <><FaCheck /> Post Job Now</>}
-                </button>
-            </div>
-
-          </div>
-        </form>
-
+          </form>
+        </div>
       </div>
-
       <Footer />
     </div>
   );
